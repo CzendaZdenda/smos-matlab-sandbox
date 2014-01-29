@@ -1,0 +1,1 @@
+SMOS data (.DBL, .zip, dir/.DBL) goes here
