@@ -28,8 +28,29 @@ classdef const
             SMOSPoint_FOOTPRINT_Axis2_COL = 11;
             SMOSPoint_PIXEL_RADIOMETRIC_ACCURACY_COL = 12;
             
+            BEAM_Grid_Point_ID = 1;
+            BEAM_Latitude = 2;
+            BEAM_Longitude = 3;
+            BEAM_Altitude = 4;
+            BEAM_Grid_Point_Mask = 5;
+            BEAM_BT_Data_Counter = 6;
+            BEAM_Flags = 7;
+            BEAM_BT_Value_Real = 8;
+            BEAM_BT_Value_Imag = 9;
+            BEAM_Pixel_Radiometric_Accuracy = 10;
+            BEAM_Incidence_Angle = 11;
+            BEAM_Azimuth_Angle = 12;
+            BEAM_Faraday_Rotation_Angle = 13;
+            BEAM_Geometric_Rotation_Angle = 14;
+            BEAM_Snapshot_ID_of_Pixel = 15;
+            BEAM_Footprint_Axis1 = 16;
+            BEAM_Footprint_Axis2 = 17;
+            
             V_POLARIZATION = 0;
             H_POLARIZATION = 1;
+            
+            VISIBLE_ON = 1;
+            VISIBLE_OFF = 0;
         end
         
 end
