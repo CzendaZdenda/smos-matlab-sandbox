@@ -1,0 +1,140 @@
+classdef SMOSPoint < handle
+    %SMOSPoint Class to keep information about point from SMOS satelite
+    %   and data about brightness temperature by date
+    %   TODO>Detailed explanation goes here
+    
+    properties
+        id = '';
+        lat = '';
+        lon = '';
+        values = containers.Map('KeyType','double','ValueType','any');
+    end
+    
+    methods 
+        % constructor
+        function Point = SMOSPoint
+            Point.values = containers.Map('KeyType','double','ValueType','any');
+        end
+        
+        function addRow(SMOSPoint, dateNumber, row)
+            % addRow(dateNumber, row)
+            %   
+            
+            if SMOSPoint.values.isKey(dateNumber)
+                data = SMOSPoint.values(dateNumber);
+                data = [data;row];
+                SMOSPoint.values(dateNumber) = data;
+            else
+                SMOSPoint.values(dateNumber) = row;
+            end
+        end
+        
+        function [IncidenceAgles, BrightnesTemperaturesReal] = GetDataByPolarizationAndDateNumber(SMOSPoint, polarization, dateNumber)
+            % GetDataByPolarizationAndDateNumber(polarization, dateNumber)
+            %   Get data (IncidenceAgle, BrightnesTemperatureReal) for specific polarization and date.
+            
+            IncidenceAgles = [];
+            BrightnesTemperaturesReal = [];
+            
+            if ~SMOSPoint.values.isKey(dateNumber)
+                display('No data available for this day. Try another one.');                
+            else
+                dataPerDay = SMOSPoint.values(dateNumber);
+                
+                IncidenceAgles = zeros(70,1);
+                BrightnesTemperaturesReal = zeros(70,1);
+                
+                cnt = 0;
+                
+                % get just data for needed polarization
+                for rowIdx=1:size(dataPerDay,1)
+                    if isequal(dataPerDay(rowIdx, const.SMOSPoint_POLARIZATION_COL),polarization)
+                        cnt = cnt + 1;
+                        IncidenceAgles(cnt) = dataPerDay(rowIdx,const.SMOSPoint_INCIDENCE_ANGLE_COL);
+                        BrightnesTemperaturesReal(cnt) = dataPerDay(rowIdx,const.SMOSPoint_BTReal_COL);
+                    end
+                end
+                
+                IncidenceAgles = IncidenceAgles(1:cnt);
+                BrightnesTemperaturesReal = BrightnesTemperaturesReal(1:cnt);
+            end
+            
+        end
+        
+        function Figure = PlotVAndHPolarizationsByDateNumber(point, dateNumber, visible)
+            % PlotVAndHPolarizationsByDateNumber(dateNumber)
+            %   Plot graph by particular day with vertical and horizontal
+            %   polarizations in dependence of incedence angle.
+            
+            if nargin==2 || ~isequal(class(visible),'double')
+                visible = 1;
+            end
+            
+            % sort data first
+            point.SortDataByColumnAndDate(const.SMOSPoint_INCIDENCE_ANGLE_COL, dateNumber);
+            
+            % polarization = '0' -> check it
+            [H_IA,H_BTr] = point.GetDataByPolarizationAndDateNumber(const.H_POLARIZATION, dateNumber);
+            
+            % polarization = '1' -> check it
+            [V_IA,V_BTr] = point.GetDataByPolarizationAndDateNumber(const.V_POLARIZATION, dateNumber);
+            
+            % if want to see the graph, just uncomment it
+            if isequal(visible,0)
+                set(gcf,'Visible','off');
+            end
+            
+            %figure
+            plot(V_IA,V_BTr,'-rx');
+            hold on;
+            plot(H_IA,H_BTr,'-bx');
+            title( { 'Independence of brightness temperature on incidence angle'; datestr(dateNumber); ['(' num2str(point.id) ')'] } );
+            legend('V POLARIZATION (0?)', 'H POLARIZATION (1?)');
+            ylabel({'bightness temperature - real';'[K]'});
+            xlabel({'incidence angle'; '[deg]'});
+            hold off;
+            
+            Figure = gcf;
+        end
+        
+        function Status = SortDataByColumnAndDate(point, columnIdx, dateNumber)
+           % SortDataByColumnAndDate(columnIndx, dateNumber)
+           %    Sort data in point.values(dateNumber) by particular column
+           %    (see libs/const.m).
+           
+           if ~point.values.isKey(dateNumber)
+               Status = 0;
+               display( sprintf( ['No data for date ' datestr(dateNumber) '.'] ) );
+               return
+           end
+           
+           point.values(dateNumber) = sortrows(point.values(dateNumber),columnIdx);
+           
+        end
+        
+        function Status = GenerateGraphs(point, outputFolder)        
+            addpath('libs');
+            
+            visible = const.VISIBLE_ON;
+            
+            if nargin==1 || ~isequal(exist(outputFolder, 'dir'),7)
+            	outputFolder = [pwd '\data\png\'];
+            end
+            
+            dayNumbers = point.values.keys;
+            
+            for dayIdx=1:point.values.Count
+               dayNumber = dayNumbers{dayIdx};
+               
+               point.PlotVAndHPolarizationsByDateNumber(dayNumber,visible);
+               saveas(gcf,[ outputFolder num2str(point.id) '_' num2str(dayNumber) '.png'], 'png');
+               if isequal(visible,const.VISIBLE_OFF)
+                close(gcf);
+               end
+            end
+            
+            Status = 1;
+        end
+    end
+
+end
