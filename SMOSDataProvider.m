@@ -43,7 +43,7 @@ classdef SMOSDataProvider < handle
             point.lat = LAT;
             point.lon = LON;
             dProvider.Points(ID) = point;
-            display(['Point ' num2str(point.id) ' created.' ]);
+            %display(['Point ' num2str(point.id) ' created.' ]);
         end
     end
         
@@ -86,21 +86,31 @@ classdef SMOSDataProvider < handle
         
     end
      
-	function UpdatePoints(dataProvider)
+	function UpdatePoints(dataProvider, BEAMMode)
         % UpdatePoints()
         %   read .csv files from CSV storage (dataProvider.CSVDir) and process them
+        startTime = cputime;
         
         addpath('libs');
          
         CSVFiles = dir( [dataProvider.CSVDir '*.csv']);
 
+        if nargin==1 || ~isequal(class(BEAMMode),'double')
+            BEAMMode = 0;
+        end
+        
         for csvIdx=1:length(CSVFiles)
             csvFileName = CSVFiles(csvIdx).name;
             
             display(['File ' csvFileName ' is processing...']);
             
             csvFileFullName = [dataProvider.CSVDir csvFileName];
-            csv = dlmread(csvFileFullName,';',1,0);
+            
+            if BEAMMode
+                csv = dlmread(csvFileFullName,';',2,0);
+            else
+                csv = dlmread(csvFileFullName,';',1,0);
+            end
             
             startSMOSNameIdx = strfind(csvFileName,'SM_REPR_MIR');
             startSMOSDateIdx = startSMOSNameIdx+length('SM_REPR_MIR_SCLF1C_');
@@ -110,9 +120,16 @@ classdef SMOSDataProvider < handle
             SMOSDateNumber = datenum(csvFileName(startSMOSDateIdx:endSMOSDateIdx),'yyyymmdd');
             
             for rowIdx=1:size(csv,1)
-                tId = csv(rowIdx,const.CSV_ID_COL);
-                tLat = csv(rowIdx,const.CSV_LAT_COL);
-                tLon = csv(rowIdx,const.CSV_LON_COL);
+                if BEAMMode
+                    % TODO> kostyl
+                    tId = csv(rowIdx,const.BEAM_Grid_Point_ID);
+                    tLat = csv(rowIdx,const.BEAM_Latitude);
+                    tLon = csv(rowIdx,const.CSV_LON_COL);
+                else
+                    tId = csv(rowIdx,const.CSV_ID_COL);
+                    tLat = csv(rowIdx,const.CSV_LAT_COL);
+                    tLon = csv(rowIdx,const.CSV_LON_COL);
+                end
                 
                 if ~isequal(exist('lastSMOSPoint','var'),1)
                     lastSMOSPoint = SMOSPoint();
@@ -122,12 +139,29 @@ classdef SMOSDataProvider < handle
                     lastSMOSPoint = dataProvider.GetPointById(tId, tLat, tLon);
                 end
                 
-                row = csv(rowIdx,const.CSV_ID_COL+1:end);
+                if BEAMMode
+                	row(1) = csv(rowIdx,const.BEAM_Latitude);
+                    row(2) = csv(rowIdx,const.BEAM_Longitude);
+                    row(3) = csv(rowIdx,const.BEAM_BT_Value_Real);
+                    row(4) = csv(rowIdx,const.BEAM_BT_Value_Imag);
+                    row(5) = mod(csv(rowIdx,const.BEAM_Flags),4);
+                    row(6) = csv(rowIdx,const.BEAM_Incidence_Angle);
+                    row(7) = csv(rowIdx,const.BEAM_Azimuth_Angle);
+                    row(8) = csv(rowIdx,const.BEAM_Faraday_Rotation_Angle);
+                    row(9) = csv(rowIdx,const.BEAM_Geometric_Rotation_Angle);
+                    row(10) = csv(rowIdx,const.BEAM_Footprint_Axis1);
+                    row(11) = csv(rowIdx,const.BEAM_Footprint_Axis2);
+                    row(12) = csv(rowIdx,const.BEAM_Pixel_Radiometric_Accuracy);
+                else
+                    row = csv(rowIdx,const.CSV_LAT_COL:end);
+                end
+                
                 lastSMOSPoint.addRow(SMOSDateNumber,row);
             end
             display(sprintf(['Processing file ' csvFileName ' completed.\n']));
         end
         
+        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
     end
     
     function Status = GenerateGraphs(dProvider)

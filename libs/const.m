@@ -28,6 +28,7 @@ classdef const
             SMOSPoint_FOOTPRINT_Axis2_COL = 11;
             SMOSPoint_PIXEL_RADIOMETRIC_ACCURACY_COL = 12;
             
+            % ??????
             BEAM_Grid_Point_ID = 1;
             BEAM_Latitude = 2;
             BEAM_Longitude = 3;
