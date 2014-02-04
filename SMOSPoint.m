@@ -8,12 +8,21 @@ classdef SMOSPoint < handle
         lat = '';
         lon = '';
         values = containers.Map('KeyType','double','ValueType','any');
+        source = ''; % like 'db' or 'cvs'
     end
     
     methods 
         % constructor
-        function Point = SMOSPoint
-            Point.values = containers.Map('KeyType','double','ValueType','any');
+        function Point = SMOSPoint(data)
+            if nargin ==1
+                if isequal(class(data),'dataset')
+                    % TODO somehow create Point.values from that
+                else
+                    display('Unsupported input data. Empty SMOSPoint were created');
+                end
+            else
+                Point.values = containers.Map('KeyType','double','ValueType','any');
+            end
         end
         
         function addRow(SMOSPoint, dateNumber, row)
@@ -112,10 +121,14 @@ classdef SMOSPoint < handle
            
         end
         
-        function Status = GenerateGraphs(point, outputFolder)        
+        function Status = GenerateGraphs(point, outputFolder, visible)
+            startTime = cputime;
+            
             addpath('libs');
             
-            visible = const.VISIBLE_ON;
+            if nargin ~= 4
+                visible = const.VISIBLE_OFF;
+            end
             
             if nargin==1 || ~isequal(exist(outputFolder, 'dir'),7)
             	outputFolder = [pwd '\data\png\'];
@@ -123,6 +136,7 @@ classdef SMOSPoint < handle
             
             dayNumbers = point.values.keys;
             
+            % TODO testing with 'parfor'
             for dayIdx=1:point.values.Count
                dayNumber = dayNumbers{dayIdx};
                
@@ -132,6 +146,8 @@ classdef SMOSPoint < handle
                 close(gcf);
                end
             end
+            
+            display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
             
             Status = 1;
         end
