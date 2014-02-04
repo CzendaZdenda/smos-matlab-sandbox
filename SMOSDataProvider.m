@@ -5,32 +5,26 @@ classdef SMOSDataProvider < handle
  
  properties
     Points = containers.Map('KeyType','double','ValueType','any');
-    %DBLDir = [pwd '\testData\SMOS\'];
-    %CSVDir = [pwd '\testData\CSV\'];
+
     DBLDir = [pwd '\data\smos\'];
     CSVDir = [pwd '\data\csv\'];
     
     SQLFilesDir = [pwd '\data\sql\'];
     conn = '';
-    % TODO create method SetDBConection(...)
+
     databasename = 'smos';
     username = 'smos';
     password = '';
     driver = 'org.postgresql.Driver';
     databaseurl = 'jdbc:postgresql://localhost:5432/smos';
     
-    tableName = 'smos_bt_point';
+    tableRecordName = 'smos_records';
+    tablePointsName = 'points';
     
-    dbColumns = {'grid_point_id', 'observ_date', 'polarization', 'bt_value_real', 'bt_value_imag', ...
+    dbRecordColumns = {'grid_point_id', 'observ_date', 'polarization', 'bt_real', 'bt_imag', ...
                 'pixel_radiometric_accuracy', 'incidence_angle', 'azimuth_angle', 'faraday_rotation_angle', ...
                 'geometric_rotation_angle', 'footprint_axis1', 'footprint_axis2', 'origin'};
-            
-    sqlTemplate = [ 'INSERT INTO table_name (grid_point_id, observ_date, polarization, bt_value_real, bt_value_imag, ' ...
-        'pixel_radiometric_accuracy, incidence_angle, azimuth_angle, faraday_rotation_angle, ' ...
-        'geometric_rotation_angle, footprint_axis1, footprint_axis2, origin) ' ...
-        'VALUES( DB_Grid_Point_ID, ''DB_Observ_date'', DB_Polarization, DB_BT_Real_COL, DB_BT_Imag_COL, ' ...
-        'DB_Pixel_radiometric_accuracy, DB_Incidence_angle, DB_Azimuth_angle, DB_Faraday_rotation_angle, ' ...
-        'DB_Geometric_rotation_angle, DB_Footprint_axis1, DB_Footprint_axis2, ''DB_Origin'');' ];
+    dbPointsColumns = {'smos_point', 'smos_id'};
     
     % TODO check if process all files is needed
     %   check num of rows in file and num of records in db
@@ -39,6 +33,44 @@ classdef SMOSDataProvider < handle
  end
 
  methods
+     %destructor
+     function delete(dProvider)
+         % what else should I close?
+         if isequal(class(dProvider.conn),'database') 
+            close(dProvider.conn);
+         end
+     end
+         
+     %constructor
+     function dProvider = SMOSDataProvider()
+         addpath('libs');
+         setdbprefs('DataReturnFormat','dataset');
+         
+         dProvider.databasename = 'smos';
+         dProvider.username = 'smos';
+         dProvider.password = 'smospasswd';
+         dProvider.driver = 'org.postgresql.Driver';
+         dProvider.databaseurl = 'jdbc:postgresql://localhost:5432/smos';
+     end
+     
+     function Status = setDBConnection(dProvider, dbname, username, password, driver, databaseurl)
+         dProvider.databasename = dbname;
+         dProvider.username = username;
+         dProvider.password = password;
+         dProvider.driver = driver;
+         dProvider.databaseurl = databaseurl;
+         
+         dProvider.conn = database(dProvider.databasename, dProvider.username, dProvider.password, dProvider.driver, dProvider.databaseurl);
+         
+         try
+             ping(dProvider.conn);
+             Status = const.OK;
+         catch err
+             dProvider.writeLog(err.message);
+             Status = const.NOT_OK;
+         end
+     end
+         
      function writeDBLog(dProvider, msg)
          dProvider.writeLog('db',msg);
      end
@@ -51,24 +83,57 @@ classdef SMOSDataProvider < handle
          
          fileId = fopen(dProvider.logFileName, 'a');
          fprintf(fileId, [datestr(now,'HH:MM:SS') '> ' msg '\n']);
-         %status = fclose(fileId);
+         fclose(fileId);
      end
      
-	function setDBLDir(dProvider, path)
+	 function Status = CheckDBConnection(dProvider)
+         try
+             ping(dProvider.conn);
+         catch err
+             % create connection
+             dProvider.conn = database(dProvider.databasename,dProvider.username,dProvider.password,dProvider.driver,dProvider.databaseurl);
+             ping(dProvider.conn);
+
+             % log
+             dProvider.writeDBLog(err.message);
+         end
+        
+        Status = const.OK;
+     end
+     function setDBLDir(dProvider, path)
         % setDBLDir(path)
         %   set path, where .dbl files are stored
         
      	dProvider.DBLDir = path;
-    end
+     end
      
-	function setCSVDir(dProvider, path)
+	 function setCSVDir(dProvider, path)
         % setCSVDir(path)
         %   set path, where .csv files are stored
      	
         dProvider.CSVDir = path;
-    end
+     end
+     
+     function Status = TryToCreateNewSMOSPoint(dProvider, tId, tLat, tLon)
+        % TryToCreateNewSMOSPoint(tId, tLat, tLon)
+        %   if smos point with this id does not exist in the db, create it
         
-    function point = GetPointById(dProvider, ID, LAT, LON)
+        dProvider.CheckDBConnection();
+        sql = ['SELECT count(*) from ' dProvider.tablePointsName ' WHERE smos_id = ' num2str(tId)];
+        
+        result = fetch(dProvider.conn, sql);
+               
+        if isequal(result.count,0)
+            data = { ['<wkt>ST_GeomFromText(''POINT(' num2str(tLon) ' ' num2str(tLat) ')'',4326)<wkt>'], tId};
+            insert_wkt(dProvider.conn, dProvider.tablePointsName, dProvider.dbPointsColumns, data);
+            
+            dProvider.writeDBLog(['Points no. ' num2strt(Id) ' was created.']);
+        end
+        
+        Status = 1;
+     end
+     
+     function point = GetPointById(dProvider, ID, LAT, LON)
         % GetPointById(id, latitude, longitude)
         %   get point, if does not exist, create new
         
@@ -81,9 +146,9 @@ classdef SMOSDataProvider < handle
             point.lat = LAT;
             point.lon = LON;
             dProvider.Points(ID) = point;
-            %display(['Point ' num2str(point.id) ' created.' ]);
+            dProvider.writeDBLog(['Point ' num2str(point.id) ' created.' ]);
         end
-    end
+     end
         
 	function CreateCSVFromDBLFiles(dataProvider)
         % CreateCSVFromDBLFiles()
@@ -233,18 +298,17 @@ classdef SMOSDataProvider < handle
         
         CSVFiles = dir( [dProvider.CSVDir '*.csv']);
         
-        try
-        	ping(dProvider.conn);
-        catch err
-            % create connection
-            dProvider.conn = database(dProvider.databasename,dProvider.username,dProvider.password,dProvider.driver,dProvider.databaseurl);
-            ping(dProvider.conn);
-
-            % log
-            dProvider.writeDBLog(err.message);
+        if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
+           dProvider.writeDBLog('Can not connect to database.');
+           Status = const.NOT_OK;
+           return
         end
         
         dProvider.writeDBLog('Processing .csv files.');
+        
+        %%% TODO> check the parallel computing possibilities of MATLAB 
+        %matlabpool
+        %parfor csvIdx=1:length(CSVFiles)
         for csvIdx=1:length(CSVFiles)
             startTimeOneFile = cputime;
             
@@ -261,7 +325,7 @@ classdef SMOSDataProvider < handle
             csv = dlmread(csvFileFullName,';',1,0);
             
             % preallocation dimension of data
-            data=cell(size(csv,1),size(dProvider.dbColumns,2));
+            data=cell(size(csv,1),size(dProvider.dbRecordColumns,2));
             
             startSMOSNameIdx = strfind(csvFileName,'SM_REPR_MIR');
             startSMOSDateIdx = startSMOSNameIdx+length('SM_REPR_MIR_SCLF1C_');
@@ -270,25 +334,21 @@ classdef SMOSDataProvider < handle
             % convert date string into datenumber
             SMOSDate = datenum(csvFileName(startSMOSDateIdx:endSMOSDateIdx),'yyyymmdd');
             SMOSDateSQL = datestr(SMOSDate,'yyyy-mm-dd');
-
-            %   create .sql file where inserts will be kept
-            if ~isequal(exist(dProvider.SQLFilesDir,'dir'),7)
-                % maybe check status [SUCCESS,MESSAGE,MESSAGEID] = mkdir(NEWDIR)
-                mkdir(dProvider.SQLFilesDir);
-            end
             
-            %{
-            SQLFileName = strrep(csvFileName,'.csv','');
-            fileId = fopen([dProvider.SQLFilesDir SQLFileName], 'w');
-            %}
-            
+            lastSMOSPointID = 0;
             
             for rowIdx=1:size(csv,1)
                 recordCnt = recordCnt + 1;
-                if isequal(mod(recordCnt,10000),0)
-                    display(sprintf(['Number of already processed records: ' num2str(recordCnt)]));
-                end
                 
+                tId = csv(rowIdx,const.CSV_ID_COL);
+                tLat = csv(rowIdx,const.CSV_LAT_COL);
+                tLon = csv(rowIdx,const.CSV_LON_COL);
+                %{
+                if ~isequal(lastSMOSPointID, tId);
+                    lastSMOSPointID = tId;
+                    dProvider.TryToCreateNewSMOSPoint(tId, tLat, tLon);
+                end
+                %}
                 data(recordCnt,:) = {num2str(csv(rowIdx, const.CSV_ID_COL)) ...
                     SMOSDateSQL ...
                     num2str(csv(rowIdx, const.CSV_POLARIZATION_COL)) ...
@@ -302,37 +362,24 @@ classdef SMOSDataProvider < handle
                     num2str(csv(rowIdx, const.CSV_FOOTPRINT_Axis1_COL)) ...
                     num2str(csv(rowIdx, const.CSV_FOOTPRINT_Axis2_COL)) ...
                     csvFileName};
-                %{
-                sql = strrep(dProvider.sqlTemplate,'table_name',dProvider.tableName);
-                sql = strrep(sql, 'DB_Grid_Point_ID', num2str(csv(rowIdx, const.CSV_ID_COL)));
-                sql = strrep(sql, 'DB_Observ_date', SMOSDateSQL);
-                sql = strrep(sql, 'DB_Polarization', num2str(csv(rowIdx, const.CSV_POLARIZATION_COL)));
-                sql = strrep(sql, 'DB_BT_Real_COL', num2str(csv(rowIdx, const.CSV_BTReal_COL)));
-                sql = strrep(sql, 'DB_BT_Imag_COL', num2str(csv(rowIdx, const.CSV_BTImaginary_COL)));
-                sql = strrep(sql, 'DB_Pixel_radiometric_accuracy', num2str(csv(rowIdx, const.CSV_PIXEL_RADIOMETRIC_ACCURACY_COL)));
-                sql = strrep(sql, 'DB_Incidence_angle', num2str(csv(rowIdx, const.CSV_INCIDENCE_ANGLE_COL)));
-                sql = strrep(sql, 'DB_Azimuth_angle', num2str(csv(rowIdx, const.CSV_AZIMUTH_ANGLE_COL)));
-                sql = strrep(sql, 'DB_Faraday_rotation_angle', num2str(csv(rowIdx, const.CSV_FARADAY_ROTATION_ANGLE_COL)));
-                sql = strrep(sql, 'DB_Geometric_rotation_angle', num2str(csv(rowIdx, const.CSV_GEOMETRIC_ROTATION_ANGLE_COL)));
-                % sql = strrep(sql, 'DB_Snapshot_id_of_pixel', num2str(csv(rowIdx, const.CSV_)));
-                sql = strrep(sql, 'DB_Footprint_axis1', num2str(csv(rowIdx, const.CSV_FOOTPRINT_Axis1_COL)));
-                sql = strrep(sql, 'DB_Footprint_axis2', num2str(csv(rowIdx, const.CSV_FOOTPRINT_Axis2_COL)));
-                sql = strrep(sql, 'DB_Origin', csvFileName);
                 
-                % ulozim do souboru
-                fprintf(fileId, sql);
-                %}
-                
-                
+                if isequal(mod(recordCnt,10000),0)
+                    display(sprintf(['Number of already processed records: ' num2str(recordCnt)]));
+                end
             end
             
             % insert points into db
-            dProvider.writeDBLog(['Inserting ' csvFileName ' file into db.']);
-            insert(dProvider.conn,dProvider.tableName, dProvider.dbColumns, data);
-
+            dProvider.writeDBLog([num2str(recordCnt) ' rows have been read from .csv file.']);
+            dProvider.writeDBLog('Inserting these records into db.');
+            insert(dProvider.conn, dProvider.tableRecordName, dProvider.dbRecordColumns, data);
+            
+            %get size of db after this insert
+            s = fetch(dProvider.conn, ['SELECT pg_size_pretty(pg_total_relation_size(''' dProvider.tableRecordName '''))']);
+            dProvider.writeDBLog(['Db size: ' s.pg_size_pretty{1} '.']);
+            
             msg = ['Processing ' csvFileName ' file finished in ' num2str(cputime-startTimeOneFile) 'sec.'];
             dProvider.writeDBLog(msg);
-            display(msg);
+            display(sprintf(msg));
         end
         
         display(sprintf(['Processing time: ' num2str(cputime-startTime) 'sec.']));
@@ -342,11 +389,62 @@ classdef SMOSDataProvider < handle
         Status = 1;
     end
     
-    function Status = GetSMOSPointDB()
-        % get point from db
+    function point = GetSMOSPointDB(dProvider, id)
+        % get data for specific point from db
+        % but first check whether the point already exist
+        startTime = cputime;
+        datestr(now,'HH:MM:SS')
+        point = dProvider.GetPointById(id, '', '');
+        
+        if isequal(point.values.Count,0)
+            if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
+               dProvider.writeDBLog('Can not connect to database.');
+               return
+            end
+
+            % TODO smazat az bude po testovni tehle casti
+            dProvider.tableRecordName = 'smos_bt_point';
+
+            sql = ['SELECT * FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' num2str(id)];
+            result = fetch(dProvider.conn, sql);
+
+            % create Point
+            point = SMOSPoint();
+            point.id = id;
+
+            nRecords = size(result,1);
             
-        Status = 1;
-    end
+            %matlabpool
+            %parfor recordIdx=1:nRecords
+            for recordIdx=1:nRecords
+                tmp = [ 0 0 result.bt_real(recordIdx) result.bt_imag(recordIdx) result.polarization(recordIdx) result.incidence_angle(recordIdx) ...
+                    result.azimuth_angle(recordIdx) result.faraday_rotation_angle(recordIdx) result.geometric_rotation_angle(recordIdx) ...
+                    result.footprint_axis1(recordIdx) result.footprint_axis2(recordIdx) result.pixel_radiometric_accuracy(recordIdx)];
+                %{
+                row(1) = 0; % lat
+                row(2) = 0; % lon;
+                row(3) = result.bt_real(recordIdx);
+                row(4) = result.bt_imag(recordIdx);
+                row(5) = result.polarization(recordIdx);
+                row(6) = result.incidence_angle(recordIdx);
+                row(7) = result.azimuth_angle(recordIdx);
+                row(8) = result.faraday_rotation_angle(recordIdx);
+                row(9) = result.geometric_rotation_angle(recordIdx);
+                row(10) = result.footprint_axis1(recordIdx);
+                row(11) = result.footprint_axis2(recordIdx);
+                row(12) = result.pixel_radiometric_accuracy(recordIdx);
+                %}    
+                dateNumber = datenum(result.observ_date{recordIdx},'yyyy-mm-dd');
+                
+                point.addRow(dateNumber,tmp);
+            end
+
+            point.source = 'db';
+        end
+        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
+        datestr(now,'HH:MM:SS')
+    end % EndOfGetSMOSPointDB
+    
  end
  
 end

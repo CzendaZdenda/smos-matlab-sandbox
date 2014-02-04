@@ -52,6 +52,9 @@ classdef const
             
             VISIBLE_ON = 1;
             VISIBLE_OFF = 0;
+            
+            OK = 1;
+            NOT_OK = 0;
         end
         
 end
