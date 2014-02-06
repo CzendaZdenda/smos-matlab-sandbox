@@ -45,13 +45,13 @@ if nargin == 1 || nargin == 2
 end
 
 if nargin == 2
-    [outputFolder, outputFileName, outputExtension] = fileparts(outputCSVFileName);
+    [outputFolder, ~, ~] = fileparts(outputCSVFileName);
     outputFolder = [outputFolder '\'];
 end
 
 if nargin == 3
     if isequal(exist(smosExtractorFullPath, 'var'),1)
-        [smosExtractorDir, foo, bar] = fileparts(smosExtractorFullPath);
+        [smosExtractorDir, ~, ~] = fileparts(smosExtractorFullPath);
         % ok
 	elseif isequal(exist('SmosDataExtractor\SmosDataExtractor.exe','file'),2)
         smosExtractorFullPath = [pwd '\SmosDataExtractor\SmosDataExtractor.exe'];
@@ -86,7 +86,7 @@ end
 
 command = [ smosExtractorFullPath ' ' inputDBLFile ' ' outputCSVFileName];
 
-[status,result] = system(command);
+[status,~] = system(command);
 csvFile = outputCSVFileName;
 
 % TODO> add result to log
