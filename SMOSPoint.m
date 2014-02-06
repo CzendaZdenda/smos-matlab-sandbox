@@ -151,6 +151,42 @@ classdef SMOSPoint < handle
             
             Status = 1;
         end
+        
+        function BT = GetBTByIAByDateByPolarization(point, incidenceAngle, dateNumber, polarization)
+            point.SortDataByColumnAndDate(const.SMOSPoint_INCIDENCE_ANGLE_COL, dateNumber);
+            [IA,BTr] = point.GetDataByPolarizationAndDateNumber(polarization, dateNumber);
+            
+            [~, i, ~] = unique(IA);
+            IA = IA(i);
+            BTr = BTr(i);
+            
+            BT = interp1(IA, BTr, incidenceAngle);
+        end
+        
+        function Figure = GetTimeSerieGraphByIAFromTO(point, incidenceAngle, dayFrom, dayTo)
+            
+            dayFromNumber = datenum(dayFrom,'yyyy-mm-dd');
+            dayToNumber = datenum(dayTo,'yyyy-mm-dd');
+
+            cnt = 0;
+            for day=dayFromNumber:dayToNumber
+                cnt = cnt+1;
+                % TODO check if we get something
+                yBT(cnt) = point.GetBTByIAByDateByPolarization(incidenceAngle, day, 1);
+                xDateNumber(cnt) = day;
+            end
+                        
+            figure
+            plot(xDateNumber,yBT,'-rx');
+            set(gca,'XTick',xDateNumber,'XTickLabel', datestr(xDateNumber,'yyyy-mm-dd'));
+            hold on;
+            title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(point.id) ')'] ; [dayFrom '-' dayTo] } );
+            ylabel({'bightness temperature - real';'[K]'});
+            xlabel('date');
+            hold off;
+            %}
+            
+        end
     end
 
 end

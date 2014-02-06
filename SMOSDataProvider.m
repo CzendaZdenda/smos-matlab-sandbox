@@ -141,7 +141,7 @@ classdef SMOSDataProvider < handle
             point = dProvider.Points(ID);
         else
             % save it to Points?
-            point = SMOSPoint;
+            point = SMOSPoint();
             point.id = ID;
             point.lat = LAT;
             point.lon = LON;
@@ -161,14 +161,14 @@ classdef SMOSDataProvider < handle
         % TODO> check every status and file
         % TODO> do it with 'AllFiles' together
         for fileIdx=1:length(ZIPFiles)
-            [tFolder, tFileName, tExt] = fileparts( [dataProvider.DBLDir ZIPFiles(fileIdx).name] );
+            [~, tFileName, tExt] = fileparts( [dataProvider.DBLDir ZIPFiles(fileIdx).name] );
             inputFileName = [dataProvider.DBLDir tFileName tExt];
             outputFileName = [dataProvider.CSVDir tFileName '.csv'];
             dbl2csv( inputFileName, outputFileName);
         end
         
         for fileIdx=1:length(DBLFiles)
-            [tFolder, tFileName, tExt] = fileparts( [dataProvider.DBLDir DBLFiles(fileIdx).name] );
+            [~, tFileName, tExt] = fileparts( [dataProvider.DBLDir DBLFiles(fileIdx).name] );
             inputFileName = [dataProvider.DBLDir tFileName tExt];
             outputFileName = [dataProvider.CSVDir tFileName '.csv'];
             dbl2csv( inputFileName, outputFileName);
@@ -343,12 +343,12 @@ classdef SMOSDataProvider < handle
                 tId = csv(rowIdx,const.CSV_ID_COL);
                 tLat = csv(rowIdx,const.CSV_LAT_COL);
                 tLon = csv(rowIdx,const.CSV_LON_COL);
-                %{
+
                 if ~isequal(lastSMOSPointID, tId);
                     lastSMOSPointID = tId;
                     dProvider.TryToCreateNewSMOSPoint(tId, tLat, tLon);
                 end
-                %}
+
                 data(recordCnt,:) = {num2str(csv(rowIdx, const.CSV_ID_COL)) ...
                     SMOSDateSQL ...
                     num2str(csv(rowIdx, const.CSV_POLARIZATION_COL)) ...
@@ -371,6 +371,7 @@ classdef SMOSDataProvider < handle
             % insert points into db
             dProvider.writeDBLog([num2str(recordCnt) ' rows have been read from .csv file.']);
             dProvider.writeDBLog('Inserting these records into db.');
+
             insert(dProvider.conn, dProvider.tableRecordName, dProvider.dbRecordColumns, data);
             
             %get size of db after this insert
@@ -393,21 +394,19 @@ classdef SMOSDataProvider < handle
         % get data for specific point from db
         % but first check whether the point already exist
         startTime = cputime;
-        datestr(now,'HH:MM:SS')
-        point = dProvider.GetPointById(id, '', '');
+        
+        point = dProvider.GetPointById(id, 0, 0);
         
         if isequal(point.values.Count,0)
+            
             if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
                dProvider.writeDBLog('Can not connect to database.');
                return
             end
 
-            % TODO smazat az bude po testovni tehle casti
-            dProvider.tableRecordName = 'smos_bt_point';
-
             sql = ['SELECT * FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' num2str(id)];
             result = fetch(dProvider.conn, sql);
-
+            display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
             % create Point
             point = SMOSPoint();
             point.id = id;
@@ -440,10 +439,50 @@ classdef SMOSDataProvider < handle
             end
 
             point.source = 'db';
+            dProvider.Points(point.id) = point;
         end
         display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
-        datestr(now,'HH:MM:SS')
     end % EndOfGetSMOSPointDB
+    
+    function PlotTimeSerie(dProvider, pointID, polarization, IA, From, To)
+       startTime = cputime;
+       display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
+       if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
+               dProvider.writeDBLog('Can not connect to database.');
+               return
+       end
+       
+       display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
+        
+       sql = ['SELECT getTimeSerieData(' num2str(IA) ', i, ' num2str(polarization) ... 
+           ', ' num2str(pointID) ') as bt, i as dateString FROM (SELECT observ_date FROM smos_records WHERE grid_point_id = ' ...
+           num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
+           To ''' GROUP BY observ_date ORDER BY observ_date) g(i)'];
+       
+       timeSerieData = fetch(dProvider.conn, sql);
+       
+       if isequal(size(timeSerieData,1),0)
+          display(sprintf(['No data available for point no. ' num2str(pointID) ' in this period.']));
+          return
+       end
+       
+       display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
+       
+       xDateNum = datenum(timeSerieData.datestring, 'yyyy-mm-dd');
+       
+       figure
+       plot(xDateNum, timeSerieData.bt, '-rx');
+       set(gca,'XTick',xDateNum,'XTickLabel', timeSerieData.datestring);
+       hold on;
+       title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(pointID) ')'] ; [From '-' To] } );
+       %legend('V POLARIZATION (0?)', 'H POLARIZATION (1?)');
+       ylabel({'bightness temperature - real';'[K]'});
+       xlabel('date');
+       hold off;
+       
+       display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
+
+    end
     
  end
  
