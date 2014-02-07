@@ -132,8 +132,9 @@ classdef SMOSDataProvider < handle
         
         Status = 1;
      end
-     
+     % deprecated
      function point = GetPointById(dProvider, ID, LAT, LON)
+        % deprecated
         % GetPointById(id, latitude, longitude)
         %   get point, if does not exist, create new
         
@@ -188,8 +189,8 @@ classdef SMOSDataProvider < handle
         end
         
     end
-     
-	function UpdatePoints(dataProvider, BEAMMode)
+     % deprecated
+	 function UpdatePoints(dataProvider, BEAMMode)
         % UpdatePoints()
         %   read .csv files from CSV storage (dataProvider.CSVDir) and process them
         startTime = cputime;
@@ -265,9 +266,9 @@ classdef SMOSDataProvider < handle
         end
         
         display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
-    end
+     end
     
-    function Status = GenerateGraphs(dProvider)
+     function Status = GenerateGraphs(dProvider)
         addpath('libs');
         cntPoints = dProvider.Points.Count;
         pointNumbers = dProvider.Points.keys; % as a cell
@@ -289,9 +290,9 @@ classdef SMOSDataProvider < handle
         end
         
         Status = 1;
-    end
+     end
     
-    function Status = UpdateDB(dProvider)
+     function Status = UpdateDB(dProvider)
         startTime = cputime;
         dProvider.writeDBLog('Start udating db.');
         addpath('libs');
@@ -388,12 +389,15 @@ classdef SMOSDataProvider < handle
         
         close(dProvider.conn);
         Status = 1;
-    end
-    
-    function point = GetSMOSPointDB(dProvider, id)
-        % get data for specific point from db
-        % but first check whether the point already exist
-        startTime = cputime;
+     end
+     
+     % deprecated
+     function point = GetSMOSPointDB(dProvider, id)
+        % GetSMOSPointDB(pointId)
+        %   get data for specific point from db
+        
+        %   but first check whether the point already exist
+        %startTime = cputime;
         
         point = dProvider.GetPointById(id, 0, 0);
         
@@ -403,36 +407,22 @@ classdef SMOSDataProvider < handle
                dProvider.writeDBLog('Can not connect to database.');
                return
             end
-
+            %display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
             sql = ['SELECT * FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' num2str(id)];
             result = fetch(dProvider.conn, sql);
-            display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
+            %display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
+            
             % create Point
             point = SMOSPoint();
             point.id = id;
 
             nRecords = size(result,1);
-            
-            %matlabpool
-            %parfor recordIdx=1:nRecords
+
             for recordIdx=1:nRecords
                 tmp = [ 0 0 result.bt_real(recordIdx) result.bt_imag(recordIdx) result.polarization(recordIdx) result.incidence_angle(recordIdx) ...
                     result.azimuth_angle(recordIdx) result.faraday_rotation_angle(recordIdx) result.geometric_rotation_angle(recordIdx) ...
                     result.footprint_axis1(recordIdx) result.footprint_axis2(recordIdx) result.pixel_radiometric_accuracy(recordIdx)];
-                %{
-                row(1) = 0; % lat
-                row(2) = 0; % lon;
-                row(3) = result.bt_real(recordIdx);
-                row(4) = result.bt_imag(recordIdx);
-                row(5) = result.polarization(recordIdx);
-                row(6) = result.incidence_angle(recordIdx);
-                row(7) = result.azimuth_angle(recordIdx);
-                row(8) = result.faraday_rotation_angle(recordIdx);
-                row(9) = result.geometric_rotation_angle(recordIdx);
-                row(10) = result.footprint_axis1(recordIdx);
-                row(11) = result.footprint_axis2(recordIdx);
-                row(12) = result.pixel_radiometric_accuracy(recordIdx);
-                %}    
+  
                 dateNumber = datenum(result.observ_date{recordIdx},'yyyy-mm-dd');
                 
                 point.addRow(dateNumber,tmp);
@@ -445,6 +435,11 @@ classdef SMOSDataProvider < handle
     end % EndOfGetSMOSPointDB
     
     function PlotTimeSerie(dProvider, pointID, polarization, IA, From, To)
+        % PlotTimeSerie(pointID, polarization, IA, From, To)
+        %   
+        %   example: 
+        %       dProvider.PlotTimeSerie(16513, 1, 40, '2010-01-13','2010-01-18')
+        
        startTime = cputime;
        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
        if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
@@ -482,6 +477,78 @@ classdef SMOSDataProvider < handle
        
        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
 
+    end
+    
+    function point = GetPointDB(dProvider, arg1, arg2)
+        %  SMOSPoint = GetPointByLatLon(lat, lon)
+        %    To obtain the closest point to given coordinates.
+        %  SMOSPoint = GetPointByLatLon(grid_point_id)
+        %    To obtain the point with that id.
+        
+        if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
+        	dProvider.writeDBLog('Can not connect to database.');
+            return
+        end
+        
+        if nargin == 2 && isnumeric(arg1)
+        	% get by id
+        	id = arg1;  
+        elseif nargin ==3 && isnumeric(arg1) && isnumeric(arg2)
+        	% get by coordinates
+        	sql = ['select nearestpoint(' num2str(arg1) ',' num2str(arg2) ')'];            
+        	result = fetch(dProvider.conn, sql);
+        	id = result.nearestpoint;
+        else
+            % smth is wrong
+            display(sprintf('Bad inputs.\n'));
+            help SMOSDataProvider.GetPointDB
+            return
+        end
+       
+        point = dProvider.GetPointById(id, 0, 0);
+        
+        if ~isequal(point.values.Count,0)
+            return
+        end
+        
+        % create Point
+        point = SMOSPoint();
+        point.id = id;
+
+        oldPreferences = setdbprefs;
+        
+        % get days
+        sqlGetDays = [ 'SELECT DISTINCT on (observ_date) observ_date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' num2str(id)];
+        
+        resultDates = fetch(dProvider.conn, sqlGetDays)
+        
+        nDates = size(resultDates,1);
+        
+        if nDates == 0
+            display(sprintf('No available data for this point.'));
+            return
+        end
+        
+        setdbprefs('DataReturnFormat','numeric');
+        
+        for dateIdx=1:nDates
+            date = resultDates.observ_date{dateIdx};
+            dateNum = datenum(date, 'yyyy-mm-dd');
+            
+            % TODO> after final design of table change the querry
+            sqlDataByDate = [ 'SELECT 0,0, bt_real, bt_imag, polarization, incidence_angle, '...
+                              'azimuth_angle, faraday_rotation_angle, geometric_rotation_angle, '...
+                              'footprint_axis1, footprint_axis2, pixel_radiometric_accuracy '...
+                              'FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' num2str(id) ...
+                              ' AND observ_date = ''' date ''' ORDER BY incidence_angle' ];
+            
+            resultData = fetch(dProvider.conn, sqlDataByDate);
+            
+            point.values(dateNum) = resultData;
+        end
+        
+        setdbprefs(oldPreferences);
+        dProvider.Points(point.id) = point;        
     end
     
  end
