@@ -98,7 +98,7 @@ classdef SMOSPoint < handle
             hold on;
             plot(H_IA,H_BTr,'-bx');
             title( { 'Independence of brightness temperature on incidence angle'; datestr(dateNumber); ['(' num2str(point.id) ')'] } );
-            legend('V POLARIZATION (0?)', 'H POLARIZATION (1?)');
+            legend('H POLARIZATION', 'V POLARIZATION');
             ylabel({'bightness temperature - real';'[K]'});
             xlabel({'incidence angle'; '[deg]'});
             hold off;
@@ -182,7 +182,8 @@ classdef SMOSPoint < handle
                         
             figure
             plot(xDateNumber,yBT,'-rx');
-            set(gca,'XTick',xDateNumber,'XTickLabel', datestr(xDateNumber,'yyyy-mm-dd'));
+            datetick('x','dd-mmm-yy')
+            %set(gca,'XTick',xDateNumber,'XTickLabel', datestr(xDateNumber,'yyyy-mm-dd'));
             hold on;
             title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(point.id) ')'] ; [dayFrom '-' dayTo] } );
             ylabel({'bightness temperature - real';'[K]'});

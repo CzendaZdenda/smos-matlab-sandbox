@@ -151,7 +151,7 @@ classdef SMOSDataProvider < handle
         end
      end
         
-	function CreateCSVFromDBLFiles(dataProvider)
+	 function CreateCSVFromDBLFiles(dataProvider)
         % CreateCSVFromDBLFiles()
         %   process .DBL files and convert them to .csv files
         
@@ -467,10 +467,9 @@ classdef SMOSDataProvider < handle
        
        figure
        plot(xDateNum, timeSerieData.bt, '-rx');
-       set(gca,'XTick',xDateNum,'XTickLabel', timeSerieData.datestring);
+       datatick('x', 'dd-mmm-yy')
        hold on;
        title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(pointID) ')'] ; [From '-' To] } );
-       %legend('V POLARIZATION (0?)', 'H POLARIZATION (1?)');
        ylabel({'bightness temperature - real';'[K]'});
        xlabel('date');
        hold off;
@@ -567,8 +566,9 @@ classdef SMOSDataProvider < handle
         
         setdbprefs(oldPreferences);
         dProvider.Points(point.id) = point;        
-    end
-    
+     end
+     
+
  end
  
 end
