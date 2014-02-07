@@ -47,8 +47,8 @@ classdef const
             BEAM_Footprint_Axis1 = 16;
             BEAM_Footprint_Axis2 = 17;
             
-            V_POLARIZATION = 0;
-            H_POLARIZATION = 1;
+            H_POLARIZATION = 0;
+            V_POLARIZATION = 1;
             
             VISIBLE_ON = 1;
             VISIBLE_OFF = 0;
