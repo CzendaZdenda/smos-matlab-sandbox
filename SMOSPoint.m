@@ -79,7 +79,7 @@ classdef SMOSPoint < handle
                 visible = 1;
             end
             
-            % sort data first
+            % sort data first <- probably it's not necessary 
             point.SortDataByColumnAndDate(const.SMOSPoint_INCIDENCE_ANGLE_COL, dateNumber);
             
             % polarization = '0' -> check it
@@ -164,6 +164,10 @@ classdef SMOSPoint < handle
         end
         
         function Figure = GetTimeSerieGraphByIAFromTO(point, incidenceAngle, dayFrom, dayTo)
+            % GetTimeSerieGraphByIAFromTO(incidenceAngle, dayFrom, dayTo)
+            %
+            %   example:
+            %      point.GetTimeSerieGraphByIAFromTO(40, '2010-01-13', '2010-01-17')
             
             dayFromNumber = datenum(dayFrom,'yyyy-mm-dd');
             dayToNumber = datenum(dayTo,'yyyy-mm-dd');
@@ -184,8 +188,8 @@ classdef SMOSPoint < handle
             ylabel({'bightness temperature - real';'[K]'});
             xlabel('date');
             hold off;
-            %}
             
+            Figure = gcf;
         end
     end
 
