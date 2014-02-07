@@ -434,7 +434,7 @@ classdef SMOSDataProvider < handle
         display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
     end % EndOfGetSMOSPointDB
     
-    function PlotTimeSerie(dProvider, pointID, polarization, IA, From, To)
+     function PlotTimeSerie(dProvider, pointID, polarization, IA, From, To)
         % PlotTimeSerie(pointID, polarization, IA, From, To)
         %   
         %   example: 
@@ -477,27 +477,45 @@ classdef SMOSDataProvider < handle
        
        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
 
-    end
+     end
     
-    function point = GetPointDB(dProvider, arg1, arg2)
-        %  SMOSPoint = GetPointByLatLon(lat, lon)
+     function pointId = GetNearestPointID(dProvider, lat, lon)
+        % SMOSPointId = GetNearestPointID(lat, lon)
+        %   Get id of point according to given coordinates.
+        
+        if nargin ==3 && isnumeric(lat) && isnumeric(lon) 
+            sql = ['select nearestpoint(' num2str(lat) ',' num2str(lon) ')'];            
+            result = fetch(dProvider.conn, sql)
+            pointId = result.nearestpoint;
+        else
+            display(sprintf('Bad inputs when calling SMOSDataProvider.GetNearestPointID(lat, lon).'));
+            help SMOSDataProvider.GetNearestPointID
+            pointId = 0;
+        end
+	 end
+    
+     function point = GetPointDB(dProvider, arg1, arg2)
+        %  SMOSPoint = GetPointDB(lat, lon)
         %    To obtain the closest point to given coordinates.
-        %  SMOSPoint = GetPointByLatLon(grid_point_id)
+        %  SMOSPoint = GetPointDB(grid_point_id)
         %    To obtain the point with that id.
         
         if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
         	dProvider.writeDBLog('Can not connect to database.');
             return
         end
-        
+
         if nargin == 2 && isnumeric(arg1)
         	% get by id
         	id = arg1;  
         elseif nargin ==3 && isnumeric(arg1) && isnumeric(arg2)
         	% get by coordinates
-        	sql = ['select nearestpoint(' num2str(arg1) ',' num2str(arg2) ')'];            
-        	result = fetch(dProvider.conn, sql);
-        	id = result.nearestpoint;
+        	id = dProvider.GetNearestPointID(arg1, arg2);
+            if id ==0
+                display(sprintf('Bad inputs when calling SMOSDataProvider.GetPointDB(lat, lon).'));
+                help SMOSDataProvider.GetPointDB
+                return
+            end
         else
             % smth is wrong
             display(sprintf('Bad inputs.\n'));
