@@ -93,6 +93,7 @@ classdef SMOSDataProvider < handle
              % create connection
              dProvider.conn = database(dProvider.databasename,dProvider.username,dProvider.password,dProvider.driver,dProvider.databaseurl);
              ping(dProvider.conn);
+             dProvider.writeDBLog('DB connection established.');
 
              % log
              dProvider.writeDBLog(err.message);
@@ -127,7 +128,7 @@ classdef SMOSDataProvider < handle
             data = { ['<wkt>ST_GeomFromText(''POINT(' num2str(tLon) ' ' num2str(tLat) ')'',4326)<wkt>'], tId};
             insert_wkt(dProvider.conn, dProvider.tablePointsName, dProvider.dbPointsColumns, data);
             
-            dProvider.writeDBLog(['Points no. ' num2strt(Id) ' was created.']);
+            dProvider.writeDBLog(['Points no. ' num2str(tId) ' was created.']);
         end
         
         Status = 1;
@@ -292,6 +293,51 @@ classdef SMOSDataProvider < handle
         end
         
         Status = 1;
+     end
+     
+     % in testing
+     function Status = UpdateDBGeometryTable(dProvider)
+         % UpdateDBGeometryTable()
+         %      To update table dProvider.tablePointsName in smos database
+         %      using .csv files in dProvider.CSVDir.
+         
+         % just for testing
+         dProvider.tablePointsName = 'points_test';
+
+         if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
+             dProvider.writeDBLog('Can not connect to database.');
+             Status = const.NOT_OK;
+             return
+         end
+         
+         dProvider.writeDBLog('Start udating geometry of points in db.');
+         CSVFiles = dir( [dProvider.CSVDir '*.csv']);
+         for csvIdx=1:length(CSVFiles)
+            % record counter
+            recordCnt = 0;
+            
+            csvFileName = CSVFiles(csvIdx).name;
+            
+            csvFileFullName = [dProvider.CSVDir csvFileName];
+            csv = dlmread(csvFileFullName,';',1,0);
+            
+            lastSMOSPointID = 0;
+            
+            for rowIdx=1:size(csv,1)
+                recordCnt = recordCnt + 1;
+                
+                tId = csv(rowIdx,const.CSV_ID_COL);
+                tLat = csv(rowIdx,const.CSV_LAT_COL);
+                tLon = csv(rowIdx,const.CSV_LON_COL);
+                
+                if ~isequal(lastSMOSPointID, tId);
+                    lastSMOSPointID = tId;
+                    dProvider.TryToCreateNewSMOSPoint(tId, tLat, tLon);
+                end
+            end
+         end       
+         Status = 1;
+         dProvider.writeDBLog('Updating geometry of points in db finished.');
      end
      
      function Status = UpdateDBRecordTable(dProvider)
@@ -626,11 +672,12 @@ classdef SMOSDataProvider < handle
         setdbprefs(oldPreferences);
         dProvider.Points(point.id) = point;        
      end
-     %TODO> under construct
-     function [H_IA, H_BT, V_IA, V_BT] = GetVVHHPolarization(dProvider, date, lat, lon)
-         % [H_AI, H_BT, V_AI, V_BT] = GetVVHHPolarization(DATE, LAT, LON)
+
+     function HAI_HBT_VAI_VBT = GetVVHHPolarization(dProvider, date, lat, lon)
+         % HAI_HBT_VAI_VBT = GetVVHHPolarization(DATE, LAT, LON)
          %      Where DATE is string in 'yyyy-mm-dd' formate, LAT and LON
-         %      are coordinates of the pixel.
+         %      are coordinates of the pixel. 
+         %      Where HAI_HBT_VAI_VBT = [H_AI, H_BT, V_AI, V_BT]
         
          if nargin ~= 4 && ~ischar(date) && ~isnumerci(lat) && ~isnumerci(lon)
             display(sprintf('Bad inputs when calling SMOSDataProvider.GetVVHHPolarization(date,lat, lon).'));
@@ -649,10 +696,11 @@ classdef SMOSDataProvider < handle
             return
          end
          
-         [H_IA, H_BT] = dProvider.GetAIBT(id, dateNum, const.H_POLARIZATION);
-         [V_IA, V_BT] = dProvider.GetAIBT(id, dateNum, const.V_POLARIZATION);
+         [H_IA, H_BT] = dProvider.GetIABT(id, date, const.H_POLARIZATION);
+         [V_IA, V_BT] = dProvider.GetIABT(id, date, const.V_POLARIZATION);
          
-         
+         minRows = min(size(H_IA,1), size(V_IA,1));
+         HAI_HBT_VAI_VBT = [H_IA(1:minRows, :) H_BT(1:minRows, :) V_IA(1:minRows, :) V_BT(1:minRows, :)];
      end
        
      
@@ -663,7 +711,6 @@ classdef SMOSDataProvider < handle
          %      for polarization POLARIZATION. Where DATE_NUM is integer
          %      that represents date in Matlab (see datestring, datenum)
          %      and POLARIZATION is integer from 0 to 4.
-         
          
          if nargin == 4
              
