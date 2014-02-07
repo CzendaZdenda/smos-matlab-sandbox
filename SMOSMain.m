@@ -4,36 +4,50 @@ function SMOSMain()
 
 clear all;
 
-addpath('libs');
+% because of constant defined in libs/const.m
+addpath('libs'); 
 
 % get data provider
 dProvider = SMOSDataProvider;
 
-% if we do not have csv files, we can create it from .dbl
+%% if we do not have csv files, we can create it from .dbl
 % (see SMOSDataProvider class, setCSVDir).
-% dProvider.setDBLDir('path/where/DBL/files/are/stored');
-% dProvider.setCSVDir('path/where/CSV/files/will/be/stored');
-
-dProvider.setDBLDir([pwd '\data\smos\']);
-dProvider.setCSVDir([pwd '\data\csv\']);
+%dProvider.setDBLDir([pwd '\data\smos\']);
+%dProvider.setCSVDir([pwd '\data\csv\']);
 %dProvider.CreateCSVFromDBLFiles();
 
-% load SMOSPoints from .csv files
-% and keep them in dProvider.Points (see dProvider.Points.keys)
-dProvider.UpdatePoints();
+%% Better to update database
+% add geometry data to db
+dProvider.UpdateDBGeometryTable();
 
-%if we want generate .png graphs for all points
-% dProvider.GenerateGraphs();
+% load SMOSPoints from .csv files and save in database
+dProvider.UpdateDBGeometryTable();
 
+%% Get point from database
+% points will be stored within dProvider.Points as instances of SMOSPoint
+% class (see dProvider.Points.keys)
 % get point number 16512
-%point = dProvider.Points(16512);
+point1 = dProvider.GetPointDB(16512)
+% get the nearest pixel to given coordintes
+point2 = dProvider.GetPointDB(-147, 68);
 
-% set day
-% datestr(day)
-%day = 734151;
+%% Get matrix with incidence angles in first column and brightness
+% temperature in second. 
+% [P_IA, P_BT] = GetIABT(dProvider, pointId, dateNum, polarization)
 
-% plot graph by particular day with vertical and horizontal
-% polarizations in dependence of incedence angle
-%point.PlotVAndHPolarizationsByDateNumber(day);
+% get the index of point which the nearest to given coordinates
+pointId = dProvider.GetNearestPointID(-147, 68);
+
+[H_IA, H_BT] = dProvider.GetIABT(pointId, datenum('2010-01-13','yyyy-mm-dd'), const.H_POLARIZATION)
+[V_IA, V_BT] = dProvider.GetIABT(pointId, datenum('2010-01-13','yyyy-mm-dd'), const.H_POLARIZATION)
+
+% or 
+M = dProvider.GetVVHHPolarization(datenum('2010-01-13','yyyy-mm-dd'),-155.593, 71.166);
+% where M = [H_AI, H_BT, V_AI, V_BT]
+
+% plot graph by particular day with vertical and horizontal polarizations
+% in dependence of incedence angle
+%point1.PlotVAndHPolarizationsByDateNumber(datenum('2010-01-13','yyyy-mm-dd'));
+
 
 end
