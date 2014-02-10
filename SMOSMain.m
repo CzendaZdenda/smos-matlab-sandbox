@@ -16,12 +16,18 @@ dProvider = SMOSDataProvider;
 %dProvider.setCSVDir([pwd '\data\csv\']);
 %dProvider.CreateCSVFromDBLFiles();
 
+%% Set database
+%setDBConnection(dbname, username, password, driver, databaseurl)
+dProvider.setDBConnection('smos', 'smos', 'smospasswd', 'org.postgresql.Driver', 'jdbc:postgresql://localhost:5432/smos')
+dProvider.tablePointsName = 'points_test';
+dProvider.tableRecordName = 'smos_test_csv_import';
+
 %% Better to update database
 % add geometry data to db
 dProvider.UpdateDBGeometryTable();
 
 % load SMOSPoints from .csv files and save in database
-dProvider.UpdateDBGeometryTable();
+dProvider.UpdateDBRecordTable();
 
 %% Get point from database
 % points will be stored within dProvider.Points as instances of SMOSPoint
@@ -38,8 +44,8 @@ point2 = dProvider.GetPointDB(-147, 68);
 % get the index of point which the nearest to given coordinates
 pointId = dProvider.GetNearestPointID(-147, 68);
 
-[H_IA, H_BT] = dProvider.GetIABT(pointId, datenum('2010-01-13','yyyy-mm-dd'), const.H_POLARIZATION)
-[V_IA, V_BT] = dProvider.GetIABT(pointId, datenum('2010-01-13','yyyy-mm-dd'), const.H_POLARIZATION)
+[H_IA, H_BT] = dProvider.GetIABT(pointId, datenum('2010-01-13','yyyy-mm-dd'), const.H_POLARIZATION);
+[V_IA, V_BT] = dProvider.GetIABT(pointId, datenum('2010-01-13','yyyy-mm-dd'), const.V_POLARIZATION);
 
 % or 
 M = dProvider.GetVVHHPolarization(datenum('2010-01-13','yyyy-mm-dd'),-155.593, 71.166);
