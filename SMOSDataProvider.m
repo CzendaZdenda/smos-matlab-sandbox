@@ -158,8 +158,8 @@ classdef SMOSDataProvider < handle
         %   process .DBL files and convert them to .csv files
         
         % get files from 
-        ZIPFiles = dir( [dataProvider.DBLDir 'SM_REPR*.zip'] );
-        DBLFiles = dir( [dataProvider.DBLDir 'SM_REPR*.DBL'] );
+        ZIPFiles = dir( [dataProvider.DBLDir 'SM_*.zip'] );
+        DBLFiles = dir( [dataProvider.DBLDir 'SM_*.DBL'] );
         
         % TODO> check every status and file
         % TODO> do it with 'AllFiles' together
@@ -177,7 +177,7 @@ classdef SMOSDataProvider < handle
             dbl2csv( inputFileName, outputFileName);
         end
         
-        AllFiles = dir( [dataProvider.DBLDir 'SM_REPR*']);
+        AllFiles = dir( [dataProvider.DBLDir 'SM_*']);
         
         for fileIdx=1:length(AllFiles)
             item = AllFiles(fileIdx);
@@ -198,7 +198,7 @@ classdef SMOSDataProvider < handle
         %   read .csv files from CSV storage (dataProvider.CSVDir) and process them
         startTime = cputime;
         
-        addpath('libs');
+        %addpath('libs');
          
         CSVFiles = dir( [dataProvider.CSVDir '*.csv']);
 
@@ -219,8 +219,8 @@ classdef SMOSDataProvider < handle
                 csv = dlmread(csvFileFullName,';',1,0);
             end
             
-            startSMOSNameIdx = strfind(csvFileName,'SM_REPR_MIR');
-            startSMOSDateIdx = startSMOSNameIdx+length('SM_REPR_MIR_SCLF1C_');
+            startSMOSNameIdx = strfind(csvFileName,'SM_');
+            startSMOSDateIdx = startSMOSNameIdx+length('SM_REPR_MIR_SCLF1C_'); % or 'SM_OPER_MIR_SCLF1C_' doesn't metter
             endSMOSDateIdx = startSMOSDateIdx + length('20100113T051300')-1;
             
             % convert date string into datenumber
@@ -368,7 +368,7 @@ classdef SMOSDataProvider < handle
          for csvIdx=1:length(CSVFiles)
              csvFileName = CSVFiles(csvIdx).name;
              csvFileFullName = [dProvider.CSVDir csvFileName];
-             sqlCopy = ['COPY ' dProvider.tableRecordName ' FROM ''' csvFileFullName ''' CSV HEADER DELIMITER '';''' ]
+             sqlCopy = ['COPY ' dProvider.tableRecordName ' FROM ''' csvFileFullName ''' CSV HEADER DELIMITER '';''' ];
              
              try
                 fetch(dProvider.conn, sqlCopy)
@@ -424,7 +424,7 @@ classdef SMOSDataProvider < handle
             % preallocation dimension of data
             data=cell(size(csv,1),size(dProvider.dbRecordColumns,2));
             
-            startSMOSNameIdx = strfind(csvFileName,'SM_REPR_MIR');
+            startSMOSNameIdx = strfind(csvFileName,'SM_');
             startSMOSDateIdx = startSMOSNameIdx+length('SM_REPR_MIR_SCLF1C_');
             endSMOSDateIdx = startSMOSDateIdx + length('20100113T051300')-1;
             
