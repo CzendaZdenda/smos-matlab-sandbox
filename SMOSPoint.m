@@ -156,18 +156,23 @@ classdef SMOSPoint < handle
             point.SortDataByColumnAndDate(const.SMOSPoint_INCIDENCE_ANGLE_COL, dateNumber);
             [IA,BTr] = point.GetDataByPolarizationAndDateNumber(polarization, dateNumber);
             
+            if isequal(size(IA,1),0)
+                BT = '';
+                return
+            end
+            
             [~, i, ~] = unique(IA);
             IA = IA(i);
             BTr = BTr(i);
-            
+
             BT = interp1(IA, BTr, incidenceAngle);
         end
         
-        function Figure = GetTimeSerieGraphByIAFromTO(point, incidenceAngle, dayFrom, dayTo)
+        function Figure = GetTimeSerieGraphByIAFromTO(point, incidenceAngle, dayFrom, dayTo, polarization)
             % GetTimeSerieGraphByIAFromTO(incidenceAngle, dayFrom, dayTo)
             %
             %   example:
-            %      point.GetTimeSerieGraphByIAFromTO(40, '2010-01-13', '2010-01-17')
+            %      point.GetTimeSerieGraphByIAFromTO(40, '2010-01-13', '2010-01-17',0)
             
             dayFromNumber = datenum(dayFrom,'yyyy-mm-dd');
             dayToNumber = datenum(dayTo,'yyyy-mm-dd');
@@ -176,13 +181,17 @@ classdef SMOSPoint < handle
             for day=dayFromNumber:dayToNumber
                 cnt = cnt+1;
                 % TODO check if we get something
-                yBT(cnt) = point.GetBTByIAByDateByPolarization(incidenceAngle, day, 1);
-                xDateNumber(cnt) = day;
+                BT = point.GetBTByIAByDateByPolarization(incidenceAngle, day, polarization);
+                if isequal(class(BT), 'double')
+                    yBT(cnt) = BT;
+                    xDateNumber(cnt) = day;
+                end
             end
+
                         
             figure
             plot(xDateNumber,yBT,'-rx');
-            datetick('x','dd-mmm-yy')
+            datetick('x','dd-mmm-yy');
             %set(gca,'XTick',xDateNumber,'XTickLabel', datestr(xDateNumber,'yyyy-mm-dd'));
             hold on;
             title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(point.id) ')'] ; [dayFrom '-' dayTo] } );

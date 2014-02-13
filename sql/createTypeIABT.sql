@@ -1,0 +1,1 @@
+create type iabt as (ia double precision, bt double precision);

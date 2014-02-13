@@ -160,12 +160,15 @@ classdef SMOSDataProvider < handle
         ZIPFiles = dir( [dataProvider.DBLDir 'SM_*.zip'] );
         DBLFiles = dir( [dataProvider.DBLDir 'SM_*.DBL'] );
         
+        dataProvider.writeDBLog('Start converting .dbl files to .csv files.');
+        
         % TODO> check every status and file
         % TODO> do it with 'AllFiles' together
         for fileIdx=1:length(ZIPFiles)
             [~, tFileName, tExt] = fileparts( [dataProvider.DBLDir ZIPFiles(fileIdx).name] );
             inputFileName = [dataProvider.DBLDir tFileName tExt];
             outputFileName = [dataProvider.CSVDir tFileName '.csv'];
+            dataProvider.writeDBLog(['Converting .dbl file ' tFileName tExt '...']);
             dbl2csv( inputFileName, outputFileName);
         end
         
@@ -173,6 +176,7 @@ classdef SMOSDataProvider < handle
             [~, tFileName, tExt] = fileparts( [dataProvider.DBLDir DBLFiles(fileIdx).name] );
             inputFileName = [dataProvider.DBLDir tFileName tExt];
             outputFileName = [dataProvider.CSVDir tFileName '.csv'];
+            dataProvider.writeDBLog(['Converting .dbl file ' tFileName tExt '...']);
             dbl2csv( inputFileName, outputFileName);
         end
         
@@ -185,10 +189,12 @@ classdef SMOSDataProvider < handle
                 [tFolder, tFileName, tExt] = fileparts( [dataProvider.DBLDir DBLFolder '\' item.name '.DBL'] );
                 inputFileName = [tFolder '\' tFileName tExt];
                 outputFileName = [dataProvider.CSVDir tFileName '.csv'];
+                dataProvider.writeDBLog(['Converting .dbl file ' item.name '.DBL...']);
                 dbl2csv(inputFileName, outputFileName);
             end
         end
         
+        dataProvider.writeDBLog('Converting .dbl files to .csv files finished.');
      end
     
      % deprecated
@@ -351,9 +357,9 @@ classdef SMOSDataProvider < handle
          %      So just put some .csv files into dProvider.CSVFiles folder.
          
          % we need to be root
-         dProvider.username = 'postgres';
-         dProvider.password = 'papa99';
-         dProvider.conn = database(dProvider.databasename,dProvider.username,dProvider.password,dProvider.driver,dProvider.databaseurl);
+         %dProvider.username = 'postgres';
+         %dProvider.password = 'papa99';
+         %dProvider.conn = database(dProvider.databasename,dProvider.username,dProvider.password,dProvider.driver,dProvider.databaseurl);
 
          dProvider.writeDBLog('Start udating records in db.');
         
@@ -368,6 +374,7 @@ classdef SMOSDataProvider < handle
          for csvIdx=1:length(CSVFiles)
              csvFileName = CSVFiles(csvIdx).name;
              csvFileFullName = [dProvider.CSVDir csvFileName];
+             dProvider.writeDBLog(['Updating by ' csvFileName ' file...']);
              sqlCopy = ['COPY ' dProvider.tableRecordName ' FROM ''' csvFileFullName ''' CSV HEADER DELIMITER '';''' ];
              
              try
@@ -530,6 +537,89 @@ classdef SMOSDataProvider < handle
         display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
     end % EndOfGetSMOSPointDB
     
+     function [DATEs, BTs] = GetTimeSeriesData(dProvider, pointID, polarization, IA, From, To, Time)
+        % GetTimeSeriesData(pointID, polarization, IA, From, To, Time)
+        %
+        %   [DATEs, TBRs] = dProviderGetTimeSeriesData(31357, 1, 40, '2010-01-13', '2010-01-18', '05:00:00');
+        
+        
+        if nargin == 7
+            % you can use getTimeSerieDataTS1
+            %   for interpolation of BT it uses two values - one from
+            %   the closest lower angle and one from the closest bigger
+            %   angle
+            %   !!! if at least one value is missing, it return nothing !!!
+            % or getTimeSerieDataTS2
+            %   for interpolation of BT of the incidence angle it uses two
+            %   values - from two closest angles
+            
+            %{
+            % like this
+            SELECT gettimeseriedataTS2(40, to_timestamp(i|| ' 14:00:00','yyyy-mm-dd hh24:mi:ss')::timestamp, 1, 31357) as bt, i as dateString
+            FROM 
+                (
+                SELECT to_char(observ_date, 'yyyy-mm-dd') as ts 
+                FROM smos_records 
+                WHERE grid_point_id = 31357 
+                AND polarization = 1 
+                AND date_trunc('day',observ_date) BETWEEN '2012-11-29' AND '2012-12-02' 
+                GROUP BY ts ORDER BY ts
+                ) g(i);
+            %}
+            
+            usedFunction = 'getTimeSerieDataTS2';
+            
+            sql = [ ...
+                'SELECT ' usedFunction '(' num2str(IA) ', to_timestamp(i|| '' ' Time ''',''yyyy-mm-dd hh24:mi:ss'')::timestamp, ' num2str(polarization) ... 
+                ', ' num2str(pointID) ') as bt, i as dateString ' ... 
+                'FROM (SELECT to_char(observ_date, ''yyyy-mm-dd'') as date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
+                num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
+                To ''' GROUP BY date ORDER BY date) g(i)'];
+            
+        elseif nargin == 6
+            % you can use getTimeSerieData1
+            %   for interpolation of BT it uses two values - one from
+            %   the closest lower angle and one from the closest bigger
+            %   angle
+            %   !!! if at least one value is missing, it return nothing !!!
+            % or getTimeSerieData2
+            %   for interpolation of BT of the incidence angle it uses two
+            %   values - from two closest angles
+            
+            usedFunction = 'getTimeSerieData2';
+            
+            sql = [ ...
+                'SELECT ' usedFunction '(' num2str(IA) ', to_date(i,''yyyy-mm-dd''), ' num2str(polarization) ... 
+                ', ' num2str(pointID) ') as bt, i as dateString ' ... 
+                'FROM (SELECT to_char(observ_date, ''yyyy-mm-dd'') as date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
+                num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
+                To ''' GROUP BY date ORDER BY date) g(i)'];
+        else
+            display(sprintf('Wrong input arguments.'));
+            help SMOSDataProvider.GetTimeSeriesData
+            return
+        end
+        
+        if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
+               dProvider.writeDBLog('Can not connect to database.');
+               return
+        end
+        
+        timeSerieData = fetch(dProvider.conn, sql);
+        
+        if size(timeSerieData,1) == 0
+            DATEs = [];
+            BTs = [];
+         else
+            % return as num representation
+            DATEs = datenum(timeSerieData.datestring, 'yyyy-mm-dd');
+            % or just string
+            % DATEs = timeSerieData.datestring;
+            BTs = timeSerieData.bt;
+        end                        
+
+     end
+     
      function PlotTimeSerie(dProvider, pointID, polarization, IA, From, To)
         % PlotTimeSerie(pointID, polarization, IA, From, To)
         %   
@@ -544,12 +634,12 @@ classdef SMOSDataProvider < handle
        end
        
        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
-        
-       sql = ['SELECT getTimeSerieData(' num2str(IA) ', i, ' num2str(polarization) ... 
-           ', ' num2str(pointID) ') as bt, i as dateString FROM (SELECT observ_date FROM smos_records WHERE grid_point_id = ' ...
+
+       sql = ['SELECT getTimeSerieData(' num2str(IA) ', to_date(i,''yyyy-mm-dd''), ' num2str(polarization) ... 
+           ', ' num2str(pointID) ') as bt, i as dateString FROM (SELECT to_char(observ_date, ''yyyy-mm-dd'') as date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
            num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
-           To ''' GROUP BY observ_date ORDER BY observ_date) g(i)'];
-       
+           To ''' GROUP BY date ORDER BY date) g(i)']
+
        timeSerieData = fetch(dProvider.conn, sql);
        
        if isequal(size(timeSerieData,1),0)
@@ -563,7 +653,7 @@ classdef SMOSDataProvider < handle
        
        figure
        plot(xDateNum, timeSerieData.bt, '-rx');
-       datatick('x', 'dd-mmm-yy')
+       datetick('x', 'dd-mmm-yy');
        hold on;
        title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(pointID) ')'] ; [From '-' To] } );
        ylabel({'bightness temperature - real';'[K]'});
@@ -585,8 +675,9 @@ classdef SMOSDataProvider < handle
         
         if nargin ==3 && isnumeric(lat) && isnumeric(lon) 
             sql = ['select nearestpoint(' num2str(lat) ',' num2str(lon) ')'];            
+            setdbprefs('DataReturnFormat','dataset');
             result = fetch(dProvider.conn, sql);
-
+            
             if size(result,1)~=0
                 pointId = result.nearestpoint;
             else
@@ -641,8 +732,10 @@ classdef SMOSDataProvider < handle
         oldPreferences = setdbprefs;
         
         % get days
-        sqlGetDays = [ 'SELECT DISTINCT on (observ_date) observ_date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' num2str(id)];
+        sqlGetDays = [ 'SELECT to_date(to_char(observ_date,''yyyy-mm-dd''),''yyyy-mm-dd'') as date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = '...
+            num2str(id) ' GROUP BY date ORDER BY date ' ];
         
+        setdbprefs('DataReturnFormat','dataset');
         resultDates = fetch(dProvider.conn, sqlGetDays);
         
         nDates = size(resultDates,1);
@@ -655,15 +748,15 @@ classdef SMOSDataProvider < handle
         setdbprefs('DataReturnFormat','numeric');
         
         for dateIdx=1:nDates
-            date = resultDates.observ_date{dateIdx};
+            date = resultDates.date{dateIdx};
             dateNum = datenum(date, 'yyyy-mm-dd');
             
             % TODO> after final design of table change the querry
-            sqlDataByDate = [ 'SELECT 0,0, bt_real, bt_imag, polarization, incidence_angle, '...
+            sqlDataByDate = [ 'SELECT lat,lon, bt_real, bt_imag, polarization, incidence_angle, '...
                               'azimuth_angle, faraday_rotation_angle, geometric_rotation_angle, '...
                               'footprint_axis1, footprint_axis2, pixel_radiometric_accuracy '...
                               'FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' num2str(id) ...
-                              ' AND observ_date = ''' date ''' ORDER BY incidence_angle' ];
+                              ' AND observ_date BETWEEN ''' date ' 00:00:00'' AND ''' date ' 23:59:59'' ORDER BY incidence_angle' ];
             
             resultData = fetch(dProvider.conn, sqlDataByDate);
             
@@ -703,8 +796,65 @@ classdef SMOSDataProvider < handle
          minRows = min(size(H_IA,1), size(V_IA,1));
          HAI_HBT_VAI_VBT = [H_IA(1:minRows, :) H_BT(1:minRows, :) V_IA(1:minRows, :) V_BT(1:minRows, :)];
      end
-       
      
+     
+     % using timestamp  
+     function [P_IA, P_BT] = GetIABTTimeStamp(dProvider, pointId, timestamp, polarization)
+         % [P_IA, P_BT] = GetIABT(POINT_ID, DATE_NUM, POLARIZATION)
+         %      Get matrix of Nx2 dimension, where N is number of rows for
+         %      pixel with smos id POINT_ID on date DATE_NUM and
+         %      for polarization POLARIZATION. Where DATE_NUM is integer
+         %      that represents date in Matlab (see datestring, datenum)
+         %      and POLARIZATION is integer from 0 to 4.
+         
+         if nargin == 4
+             
+         else
+             
+         end
+         
+         if isequal(dProvider.CheckDBConnection(),const.NOT_OK)
+        	dProvider.writeDBLog('Can not connect to database.');
+            return
+         end 
+         
+         
+         sqlFindTime = [ 'select observ_date, abs( extract( epoch from observ_date - ''' timestamp ''' ) ) as diff from smos_records' ...
+             ' where grid_point_id = ' num2str(pointId) ...
+             ' and date_trunc(''day'', observ_date) = ''' timestamp(1:length('YYYY-MM-DD')) '''' ...
+             ' group by observ_date' ...
+             ' order by diff asc ' ...
+             ' limit 1' ];
+         
+         setdbprefs('DataReturnFormat','dataset');
+         result = fetch(dProvider.conn, sqlFindTime);
+         
+         observ_date = result.observ_date{1};
+         
+         sql = ['SELECT incidence_angle, bt_real' ...
+             ' FROM ' dProvider.tableRecordName ...
+             ' WHERE grid_point_id = ' num2str(pointId) ...
+             ' AND observ_date = ''' observ_date '''' ...
+             ' AND polarization = ' num2str(polarization) ...
+             ' ORDER BY incidence_angle'];
+        
+         oldPreferences = setdbprefs;
+         setdbprefs('DataReturnFormat','numeric');
+        
+         result = fetch(dProvider.conn, sql);
+         
+         if size(result,1) == 0
+            P_IA = [];
+            P_BT = [];
+         else
+            P_IA = result(:,1);
+            P_BT = result(:,2);
+         end
+        
+         setdbprefs(oldPreferences);
+      end
+     
+     % using date
      function [P_IA, P_BT] = GetIABT(dProvider, pointId, dateNum, polarization)
          % [P_IA, P_BT] = GetIABT(POINT_ID, DATE_NUM, POLARIZATION)
          %      Get matrix of Nx2 dimension, where N is number of rows for

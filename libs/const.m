@@ -1,19 +1,20 @@
 classdef const
 
         properties (Constant)
-            CSV_ID_COL = 1;
-            CSV_LAT_COL = 2;
-            CSV_LON_COL  = 3;
-            CSV_BTReal_COL = 4;
-            CSV_BTImaginary_COL = 5;
-            CSV_POLARIZATION_COL = 6;
-            CSV_INCIDENCE_ANGLE_COL = 7;
-            CSV_AZIMUTH_ANGLE_COL = 8;
-            CSV_FARADAY_ROTATION_ANGLE_COL = 9;
-            CSV_GEOMETRIC_ROTATION_ANGLE_COL = 10;
-            CSV_FOOTPRINT_Axis1_COL = 11;
-            CSV_FOOTPRINT_Axis2_COL = 12;
-            CSV_PIXEL_RADIOMETRIC_ACCURACY_COL = 13;
+            CSV_DATE = 1;
+            CSV_ID_COL = 2;
+            CSV_LAT_COL = 3;
+            CSV_LON_COL  = 4;
+            CSV_BTReal_COL = 5;
+            CSV_BTImaginary_COL = 6;
+            CSV_POLARIZATION_COL = 7;
+            CSV_INCIDENCE_ANGLE_COL = 8;
+            CSV_AZIMUTH_ANGLE_COL = 9;
+            CSV_FARADAY_ROTATION_ANGLE_COL = 10;
+            CSV_GEOMETRIC_ROTATION_ANGLE_COL = 11;
+            CSV_FOOTPRINT_Axis1_COL = 12;
+            CSV_FOOTPRINT_Axis2_COL = 13;
+            CSV_PIXEL_RADIOMETRIC_ACCURACY_COL = 14;
             
             SMOSPoint_LAT_COL = 1;
             SMOSPoint_LON_COL  = 2;
