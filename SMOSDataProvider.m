@@ -555,27 +555,30 @@ classdef SMOSDataProvider < handle
             
             %{
             % like this
-            SELECT gettimeseriedataTS2(40, to_timestamp(i|| ' 14:00:00','yyyy-mm-dd hh24:mi:ss')::timestamp, 1, 31357) as bt, i as dateString
-            FROM 
-                (
-                SELECT to_char(observ_date, 'yyyy-mm-dd') as ts 
-                FROM smos_records 
-                WHERE grid_point_id = 31357 
-                AND polarization = 1 
-                AND date_trunc('day',observ_date) BETWEEN '2012-11-29' AND '2012-12-02' 
-                GROUP BY ts ORDER BY ts
-                ) g(i);
+            SELECT (u::btts).bt, (u::btts).ts 
+            FROM (  
+                SELECT getTimeSerieDataTS3(40, to_timestamp(i|| ' 15:00:00','yyyy-mm-dd hh24:mi:ss')::timestamp, 1, 31357) as bt
+                FROM (
+                    SELECT to_char(observ_date, 'yyyy-mm-dd') as date 
+                    FROM smos_records 
+                        WHERE grid_point_id = 31357 
+                        AND polarization = 1 
+                        AND observ_date BETWEEN '2012-11-28' AND '2012-12-16' 
+                        GROUP BY date ORDER BY date
+                ) g(i)
+            ) g(u)
             %}
             
-            usedFunction = 'getTimeSerieDataTS2';
-            
+            usedFunction = 'getTimeSerieDataTS3';
             sql = [ ...
-                'SELECT ' usedFunction '(' num2str(IA) ', to_timestamp(i|| '' ' Time ''',''yyyy-mm-dd hh24:mi:ss'')::timestamp, ' num2str(polarization) ... 
-                ', ' num2str(pointID) ') as bt, i as dateString ' ... 
+                'SELECT (u::btts).bt, (u::btts).ts FROM '...
+                '( ' ...
+                ' SELECT ' usedFunction '(' num2str(IA) ', to_timestamp(i|| '' ' Time ''',''yyyy-mm-dd hh24:mi:ss'')::timestamp, ' num2str(polarization) ... 
+                ', ' num2str(pointID) ') as bt ' ...
                 'FROM (SELECT to_char(observ_date, ''yyyy-mm-dd'') as date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
                 num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
-                To ''' GROUP BY date ORDER BY date) g(i)'];
-            
+                To ''' GROUP BY date ORDER BY date) g(i) ) g(u)'];
+	        
         elseif nargin == 6
             % you can use getTimeSerieData1
             %   for interpolation of BT it uses two values - one from
@@ -586,14 +589,33 @@ classdef SMOSDataProvider < handle
             %   for interpolation of BT of the incidence angle it uses two
             %   values - from two closest angles
             
-            usedFunction = 'getTimeSerieData2';
-            
+            %{
+            % like this
+            SELECT (u::btts).bt, (u::btts).ts
+            FROM
+            (
+                SELECT getTimeSerieDataTS3(40, i, 0, 31357)
+                FROM (
+                    SELECT observ_date
+                    FROM smos_records 
+                    WHERE grid_point_id = 31357 
+                        AND polarization = 0 
+                        AND observ_date BETWEEN '2012-11-28' AND '2012-12-16' 
+                    GROUP BY observ_date 
+                    ORDER BY observ_date
+                ) g(i)
+            ) g(u)
+            %}
+            usedFunction = 'getTimeSerieDataTS3';
             sql = [ ...
-                'SELECT ' usedFunction '(' num2str(IA) ', to_date(i,''yyyy-mm-dd''), ' num2str(polarization) ... 
-                ', ' num2str(pointID) ') as bt, i as dateString ' ... 
-                'FROM (SELECT to_char(observ_date, ''yyyy-mm-dd'') as date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
+                'SELECT (u::btts).bt, (u::btts).ts FROM '...
+                '( ' ...
+                ' SELECT ' usedFunction '(' num2str(IA) ', i, ' num2str(polarization) ... 
+                ', ' num2str(pointID) ') as bt ' ...
+                'FROM (SELECT observ_date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
                 num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
-                To ''' GROUP BY date ORDER BY date) g(i)'];
+                To ''' GROUP BY observ_date ORDER BY observ_date) g(i) ) g(u)'];
+            
         else
             display(sprintf('Wrong input arguments.'));
             help SMOSDataProvider.GetTimeSeriesData
@@ -612,9 +634,13 @@ classdef SMOSDataProvider < handle
             BTs = [];
          else
             % return as num representation
-            DATEs = datenum(timeSerieData.datestring, 'yyyy-mm-dd');
-            % or just string
-            % DATEs = timeSerieData.datestring;
+            tsTMPs = timeSerieData.ts;
+            DATEs = zeros(size(tsTMPs));
+            for tsIdx=1:size(tsTMPs,1)
+                tsTMP = tsTMPs{tsIdx};
+                DATEs(tsIdx) = datenum(str2double(tsTMP(1:4)),str2double(tsTMP(6:7)),str2double(tsTMP(9:10)),str2double(tsTMP(12:13)),str2double(tsTMP(15:16)),str2double(tsTMP(18:19)));
+            end
+            
             BTs = timeSerieData.bt;
         end                        
 
@@ -634,26 +660,46 @@ classdef SMOSDataProvider < handle
        end
        
        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
-
+    
+       %{
        sql = ['SELECT getTimeSerieData(' num2str(IA) ', to_date(i,''yyyy-mm-dd''), ' num2str(polarization) ... 
            ', ' num2str(pointID) ') as bt, i as dateString FROM (SELECT to_char(observ_date, ''yyyy-mm-dd'') as date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
            num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
-           To ''' GROUP BY date ORDER BY date) g(i)']
-
+           To ''' GROUP BY date ORDER BY date) g(i)'];
+       %}
+       usedFunction = 'getTimeSerieDataTS3';
+       sql = [ ...
+                'SELECT (u::btts).bt, (u::btts).ts FROM '...
+                '( ' ...
+                ' SELECT ' usedFunction '(' num2str(IA) ', i, ' num2str(polarization) ... 
+                ', ' num2str(pointID) ') as bt ' ...
+                'FROM (SELECT observ_date FROM ' dProvider.tableRecordName ' WHERE grid_point_id = ' ...
+                num2str(pointID) ' AND polarization = ' num2str(polarization) ' AND observ_date BETWEEN ''' From ''' AND ''' ...
+                To ''' GROUP BY observ_date ORDER BY observ_date) g(i) ) g(u)'];
+       
        timeSerieData = fetch(dProvider.conn, sql);
        
        if isequal(size(timeSerieData,1),0)
           display(sprintf(['No data available for point no. ' num2str(pointID) ' in this period.']));
           return
        end
+
+       tsTMPs = timeSerieData.ts;
+       DATEs = zeros(size(tsTMPs));
+       for tsIdx=1:size(tsTMPs,1)
+            tsTMP = tsTMPs{tsIdx};
+            DATEs(tsIdx) = datenum(str2double(tsTMP(1:4)),str2double(tsTMP(6:7)),str2double(tsTMP(9:10)),str2double(tsTMP(12:13)),str2double(tsTMP(15:16)),str2double(tsTMP(18:19)));
+       end
+       
+       BTs = timeSerieData.bt;
        
        display(sprintf(['Processing time: ' num2str(cputime-startTime) 's.']));
-       
-       xDateNum = datenum(timeSerieData.datestring, 'yyyy-mm-dd');
-       
+              
        figure
-       plot(xDateNum, timeSerieData.bt, '-rx');
-       datetick('x', 'dd-mmm-yy');
+       plot(DATEs, BTs, '-rx');
+       datetick('x', 'dd-mmm-yy', 'keepticks');
+       cursorMode = datacursormode;
+       set(cursorMode,'UpdateFcn',@TooltipFunc);
        hold on;
        title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(pointID) ')'] ; [From '-' To] } );
        ylabel({'bightness temperature - real';'[K]'});
@@ -805,7 +851,7 @@ classdef SMOSDataProvider < handle
          %      pixel with smos id POINT_ID on date DATE_NUM and
          %      for polarization POLARIZATION. Where DATE_NUM is integer
          %      that represents date in Matlab (see datestring, datenum)
-         %      and POLARIZATION is integer from 0 to 4.
+         %      and POLARIZATION is integer from 0 to 3.
          
          if nargin == 4
              

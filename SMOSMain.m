@@ -56,7 +56,7 @@ dProvider.setDBConnection('smos', 'postgres', 'papa99', 'org.postgresql.Driver',
 
 %%
 
-%{
+
 dateFrom = datenum('2012-11-28','yyyy-mm-dd');
 dateTo = datenum('2012-12-06','yyyy-mm-dd');
 
@@ -91,7 +91,8 @@ for date=dateFrom:dateTo
     end
 
 end
-%}
+return
+
 
 %% Plot time series
 
@@ -100,61 +101,103 @@ pointId = 31357;
 %pointId = dProvider.GetNearestPointID(-147, 68);
 IA = 40;
 From = '2012-11-28';
-To  = '2012-12-06';
+To  = '2012-12-16';
 Time = '15:00:00';
 
+%{
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% get data using time %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
-[DATEs, BTs] = dProvider.GetTimeSeriesData(pointId, 1, IA, From, To, Time)
+[DATEsH, BTsH] = dProvider.GetTimeSeriesData(pointId, const.H_POLARIZATION, IA, From, To, Time);
+[DATEsV, BTsV] = dProvider.GetTimeSeriesData(pointId, const.V_POLARIZATION, IA, From, To, Time);
 
-figure
-plot(DATEs,BTs,'blue');
+%{
+display('H polarization:');
+for idx=1:size(DATEsH,1)
+    display( [datestr(DATEsH(idx), 'yyyy-mm-dd HH:MM:SS') ' -> ' num2str(BTsH(idx)) ]);
+end
+
+display('V polarization:');
+for idx=1:size(DATEsV,1)
+    display( [datestr(DATEsV(idx), 'yyyy-mm-dd HH:MM:SS') ' -> ' num2str(BTsV(idx)) ]);
+end
+%}
+
+%figure
+plot(DATEsH,BTsH, 'oblue');
+hold on;
+plot(DATEsV,BTsV, 'xred');
+hold off;
 
 title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(pointId) ')'] ; [From ' - ' To] ; ['Time: ' Time]  } );
 ylabel({'bightness temperature - real';'[K]'});
 xlabel('date');
-datetick('x', 'dd-mmm-yy');
+
+datetick('x', 'dd-mmm-yy', 'keepticks');
+
+cursorMode = datacursormode;
+set(cursorMode,'UpdateFcn',@TooltipFunc);
 
 FromString2 = strrep(From,'-','');
 ToString2 = strrep(To,'-','');
 TimeString2 = strrep(Time,':','');
 
-saveas(gcf,[pwd '\data\png\' num2str(pointId) '_' IA '_' FromString2 '_' ToString2 '_T' TimeString2 'TimeSerie.png'], 'png');
+%saveas(gcf,[pwd '\data\png\' num2str(pointId) '_' IA '_' FromString2 '_' ToString2 '_T' TimeString2 'TimeSerie.png'], 'png');
+%}
 
-
+%{
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% get data don't care about time %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[DATEs, BTs] = dProvider.GetTimeSeriesData(pointId, 1, IA, From, To);
+[DATEsH, BTsH] = dProvider.GetTimeSeriesData(pointId, const.H_POLARIZATION, IA, From, To);
+[DATEsV, BTsV] = dProvider.GetTimeSeriesData(pointId, const.V_POLARIZATION, IA, From, To);
 
-figure 
-plot(DATEs,BTs,'blue');
+%figure
+plot(DATEsH,BTsH, 'oblue');
+hold on;
+plot(DATEsV,BTsV, 'xred');
+hold off;
+
+%{
+display('H polarization:');
+for idx=1:size(DATEsH,1)
+    display( [datestr(DATEsH(idx), 'yyyy-mm-dd HH:MM:SS') ' -> ' num2str(BTsH(idx)) ]);
+end
+
+display('V polarization:');
+for idx=1:size(DATEsV,1)
+    display( [datestr(DATEsV(idx), 'yyyy-mm-dd HH:MM:SS') ' -> ' num2str(BTsV(idx)) ]);
+end
+%}
 
 title( { 'Brightness temperature by incidence angle in time'; ['(' num2str(pointId) ')'] ; [From ' - ' To] } );
 ylabel({'bightness temperature - real';'[K]'});
 xlabel('date');
-datetick('x', 'dd-mmm-yy');
+
+datetick('x', 'dd-mmm-yy', 'keepticks');
+
+cursorMode = datacursormode;
+set(cursorMode,'UpdateFcn',@TooltipFunc);
 
 FromString2 = strrep(From,'-','');
 ToString2 = strrep(To,'-','');
 
 saveas(gcf,[pwd '\data\png\' num2str(pointId) '_' IA '_' FromString2 '_' ToString2 '_TimeSerie.png'], 'png');
 
-return
+%}
 
 % or 
-M = dProvider.GetVVHHPolarization(datenum('2010-01-13','yyyy-mm-dd'),-155.593, 71.166);
+%M = dProvider.GetVVHHPolarization(datenum('2010-01-13','yyyy-mm-dd'),-155.593, 71.166);
 % where M = [H_AI, H_BT, V_AI, V_BT]
 
 %% Some graphs
-point2.GetTimeSerieGraphByIAFromTO(40, '2010-01-13', '2010-01-18',1);
+%point2.GetTimeSerieGraphByIAFromTO(40, '2010-01-13', '2010-01-18',1);
 % or
-dProvider.PlotTimeSerie(31357, 1, 40, '2010-01-13', '2010-01-18');
+%dProvider.PlotTimeSerie(pointId, 1, IA, From, To);
 
 % plot graph by particular day with vertical and horizontal polarizations
 % in dependence of incedence angle
-point1.PlotVAndHPolarizationsByDateNumber(datenum('2010-01-13','yyyy-mm-dd'));
+%point1.PlotVAndHPolarizationsByDateNumber(datenum('2010-01-13','yyyy-mm-dd'));
 
 
 end
